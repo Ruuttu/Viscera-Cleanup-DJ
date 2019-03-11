@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:Viscera_Cleanup_DJ"
         xmlns:System="clr-namespace:System;assembly=mscorlib" x:Class="Viscera_Cleanup_DJ.MainWindow"
         mc:Ignorable="d"
-        Title="Viscera Cleanup DJ" Height="450" Width="800" WindowStartupLocation="CenterScreen" MinWidth="600" MinHeight="300" Loaded="Window_Loaded">
+        Title="Viscera Cleanup DJ" Height="450" Width="800" WindowStartupLocation="CenterScreen" MinWidth="540" MinHeight="330" Loaded="Window_Loaded">
     <Window.Resources>
         <JournalEntryListConverter x:Key="JournalEntryListConverter"/>
         <Style x:Key="FocusVisual">
@@ -101,21 +101,49 @@
             <Grid.ColumnDefinitions>
                 <ColumnDefinition/>
             </Grid.ColumnDefinitions>
-            <DataGrid x:Name="dataGrid" MinRowHeight="20" HorizontalGridLinesBrush="#FFC1C1C1" VerticalGridLinesBrush="#FFD6D6D6" HeadersVisibility="Column" CanUserResizeRows="False" CanUserAddRows="False" SelectionChanged="DataGrid_SelectionChanged" VerticalScrollBarVisibility="Visible" IsTabStop="True" AutoGenerateColumns="False" MaxColumnWidth="2000" MinColumnWidth="40" VerticalContentAlignment="Center" CellStyle="{DynamicResource DataGridCellStyle1}" RowStyle="{DynamicResource DataGridRowStyle1}" CanUserDeleteRows="False">
+            <DataGrid x:Name="songDataGrid" 
+                      MinRowHeight="20" 
+                      HorizontalGridLinesBrush="#FFC1C1C1" 
+                      VerticalGridLinesBrush="#FFD6D6D6" 
+                      HeadersVisibility="Column" 
+                      CanUserResizeRows="False" 
+                      CanUserAddRows="False" 
+                      VerticalScrollBarVisibility="Visible" 
+                      IsTabStop="True" 
+                      AutoGenerateColumns="False" 
+                      MaxColumnWidth="2000" 
+                      MinColumnWidth="40" 
+                      VerticalContentAlignment="Center" 
+                      CellStyle="{DynamicResource DataGridCellStyle1}" 
+                      RowStyle="{DynamicResource DataGridRowStyle1}" 
+                      CanUserDeleteRows="False" 
+                      FontSize="14" 
+                      BeginningEdit="songDataGrid_BeginningEdit"
+                      MouseDown="songDataGrid_MouseDown"
+                >
+                <DataGrid.ContextMenu>
+                    <ContextMenu Placement="Absolute">
+                        <MenuItem Header="Edit" Click="EditSongCell" />
+                        <MenuItem Header="Delete" Click="DeleteSongs" />
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
                 <DataGrid.Columns>
-                    <DataGridTextColumn Header="Title" Width="360" Binding="{Binding Title, UpdateSourceTrigger=PropertyChanged}" SortMemberPath="Title" />
-                    <DataGridTextColumn Header="Artist" Width="360" Binding="{Binding Artist, UpdateSourceTrigger=PropertyChanged}" />
+                    <DataGridTextColumn Header="Title" Width="400" Binding="{Binding Title}" SortMemberPath="Title" />
+                    <DataGridTextColumn Header="Artist" Width="344" Binding="{Binding Artist}" SortMemberPath="Artist" />
                 </DataGrid.Columns>
             </DataGrid>
-            <Label x:Name="noSongsLabel" Content="Empty! Use the buttons above to add songs." HorizontalAlignment="Center" Margin="10" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16" Height="32" Width="322" IsEnabled="False" d:IsLocked="True"/>
+            <Label x:Name="noSongsLabel" Content="Empty! Use the top left button to add songs." HorizontalAlignment="Center" Margin="10" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16" Height="32" Width="322" IsEnabled="False"/>
         </Grid>
         <StatusBar Margin="0" VerticalAlignment="Bottom" Height="28">
-            <StatusBarItem Height="28" VerticalAlignment="Top">
+            <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0,0,0">
                 <TextBlock>Audio processing by <Hyperlink Click="FFmpegLinkClick" ToolTip="https://www.ffmpeg.org">FFmpeg</Hyperlink>.</TextBlock>
             </StatusBarItem>
+            <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0" HorizontalAlignment="Right">
+                <TextBlock>asdasdasd</TextBlock>
+            </StatusBarItem>
         </StatusBar>
-        <Button x:Name="AddFilesButton" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="133" FontSize="14" Content="Add from PC..." Click="AddFilesButton_Click" BorderBrush="#FF707070" Background="#FFDDDDDD" Height="40"/>
-        <Button x:Name="AddOnlineButton" Content="Add from the web..." HorizontalAlignment="Left" Margin="148,10,0,0" VerticalAlignment="Top" Width="165" FontSize="14" Click="AddOnlineButton_Click" Height="40"/>
+        <Button x:Name="AddFilesButton" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="160" FontSize="14" Content="Add music from PC..." Click="AddFilesButton_Click" BorderBrush="#FF707070" Background="#FFDDDDDD" Height="40"/>
+        <Button x:Name="AddOnlineButton" Content="Add from the web..." HorizontalAlignment="Left" Margin="148,10,0,0" VerticalAlignment="Top" Width="165" FontSize="14" Click="AddOnlineButton_Click" Height="40" Visibility="Hidden"/>
         <Button x:Name="button" Content="Settings" HorizontalAlignment="Right" Margin="0,11,10,0" VerticalAlignment="Top" Width="89" Height="39" FontSize="14" Click="settingsButton_Click"/>
     </Grid>
 </Window>

@@ -34,31 +34,45 @@ namespace Viscera_Cleanup_DJ
             InitializeComponent();
 
             SongView = new ObservableCollection<Song>();
-            dataGrid.ItemsSource = SongView;
-            dataGrid.CellEditEnding += SongList_Edited;
+            songDataGrid.ItemsSource = SongView;
+            songDataGrid.CellEditEnding += SongList_Edited;
 
             Closing += Window_Closing;
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        // Ensure a game path is configured. 
+        // Otherwise configure automatically, or ask the user for help.
+        // Returns 1 for success and 0 for failure.
+        // Returns -1 if the user has "escaped" from the configuration wizard.
+        public int GamePathPlease()
         {
             if (Global.GamePath.Value == "" | !Directory.Exists(Global.GamePath.Value))
             {
-                string GamePath = FindGameWizard();
-                if (GamePath == null) { Close(); return; }
+                string GamePath = App.TryFindGame();
+
+                if (GamePath == "")
+                {
+                    GamePath = FindGameWizard();
+                    if (GamePath == null) { return -1; }
+                }
+
                 if (GamePath != "")
                 {
                     Global.GamePath.Value = GamePath;
-                }
-                else
+                } else
                 {
-                    //TODO: Fix message;
-                    MessengerBox.Information(this, "Continuing without Game. This is a bad idea.");
+                    return 0;
                 }
             }
 
             PlaylistEditor.Read();
             LoadSongsToView();
+            return 1;
+        }
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            GamePathPlease();
         }
 
         private void Window_Closing(object sender, CancelEventArgs e)
@@ -75,20 +89,20 @@ namespace Viscera_Cleanup_DJ
             }
 
             noSongsLabel.Visibility = SongView.Count == 0 ? Visibility.Visible : Visibility.Hidden;
+            
         }
 
         private void SongList_Edited(object sender, EventArgs e)
         {
-            //PlaylistEditor.Write();
-        }
-
-        private void DataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-
+            PlaylistEditor.Write();
         }
 
         private void AddFilesButton_Click(object sender, RoutedEventArgs e)
         {
+            if (GamePathPlease() != 1)
+            {
+                return;
+            }
             OpenFileDialog dialog = new OpenFileDialog();
             dialog.InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyMusic);
             dialog.Multiselect = true;
@@ -107,6 +121,10 @@ namespace Viscera_Cleanup_DJ
             ConversionDialog conversionDialog = new ConversionDialog();
             conversionDialog.Owner = this;
 
+            List<int> timeSamples = new List<int>();
+            Stopwatch conversionTime = new Stopwatch();
+            int filesLeft = dialog.FileNames.Length;
+
             BackgroundConverter converter = new BackgroundConverter();
             converter.RunWorkerCompleted += delegate (object s, RunWorkerCompletedEventArgs rwcea)
             {
@@ -114,9 +132,27 @@ namespace Viscera_Cleanup_DJ
             };
             converter.ProgressChanged += delegate (object s, ProgressChangedEventArgs prog)
             {
-                //Song newSong = (Song) prog.UserState;
-                //PlaylistEditor.SongList.Add(newSong);
-                //PlaylistEditor.Write();
+                if (conversionTime.IsRunning)
+                {
+                    timeSamples.Add((int)conversionTime.ElapsedTicks);
+                    if (timeSamples.Count > 20)
+                    {
+                        timeSamples.RemoveAt(0);
+                    }
+                }
+                conversionTime.Restart();
+
+                conversionDialog.progressBar.Value = prog.ProgressPercentage;
+                conversionDialog.message.Text = string.Format("Converting for Big Banger Radio:\n\"{0}\" ", System.IO.Path.GetFileName((string) prog.UserState));
+
+                if (timeSamples.Count >= 2)
+                {
+                    double ticksPerFile = timeSamples.Average();
+                    TimeSpan estimate = new TimeSpan((long)ticksPerFile * filesLeft);
+                    conversionDialog.timeEstimate.Text = string.Format("Time remaining: {0}", TimeSpan.FromSeconds((int)estimate.TotalSeconds));
+                }
+
+                filesLeft--;
             };
             converter.RunWorkerAsync(dialog.FileNames);
 
@@ -132,11 +168,6 @@ namespace Viscera_Cleanup_DJ
 
         public string FindGameWizard()
         {
-            string GamePath = App.TryFindGame();
-            if (GamePath != "") { return GamePath; }
-            
-            // -----------------------------------------------------------------------------------
-
             MessengerBox messenger = new MessengerBox(this);
             messenger.Title = "Hello!";
             messenger.Message.Text = (
@@ -150,7 +181,7 @@ namespace Viscera_Cleanup_DJ
 
             if (messenger.ClickedButton == yesButton)
             {
-                GamePath = App.GetLegitGamePath(App.BrowseForGame());
+                string GamePath = App.GetLegitGamePath(App.BrowseForGame());
                 if (GamePath != "")
                 {
                     return GamePath;
@@ -176,7 +207,7 @@ namespace Viscera_Cleanup_DJ
 
             messenger.ShowDialog();
             sniffer.CancelAsync();
-            if (messenger.Escaped) { Close(); return null; }
+            if (messenger.Escaped) { return null; }
 
             if (sniffer.GamePath != null) {
                 MessengerBox.Information(this, "The game was detected. Thanks!");
@@ -206,6 +237,75 @@ namespace Viscera_Cleanup_DJ
         {
             Hyperlink link = (Hyperlink)sender;
             Process.Start(link.ToolTip.ToString());
+        }
+
+        private void DeleteSongs(object sender, RoutedEventArgs e)
+        {
+            MessengerBox dialog = new MessengerBox(this);
+            if (songDataGrid.SelectedItems.Count == 1)
+            {
+                Song selectedSong = (Song)songDataGrid.SelectedItem;
+                dialog.Message.Text = string.Format(
+                    "Are you sure you want to delete this song?\n{0} by {1}",
+                    selectedSong.Title, selectedSong.Artist
+                );
+            } else
+            {
+                dialog.Message.Text = string.Format("Are you sure you want to delete {0} songs?", songDataGrid.SelectedItems.Count);
+            }
+            
+            var deleteButton = dialog.AddButton("Delete");
+            var cancelButton = dialog.AddButton("Cancel");
+            dialog.ShowDialog();
+            if (dialog.ClickedButton != deleteButton)
+            {
+                return;
+            }
+
+            foreach (Song selectedSong in songDataGrid.SelectedItems) {
+                if (File.Exists(selectedSong.PackageFile()))
+                {
+                    File.Delete(selectedSong.PackageFile());
+                }
+                PlaylistEditor.SongList.Remove(selectedSong);
+            }
+            PlaylistEditor.Write();
+            LoadSongsToView();
+        }
+
+        private void songDataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+        {
+            if (e.EditingEventArgs is TextCompositionEventArgs)
+            {
+                e.Cancel = true;
+            }
+
+        }
+
+        private void EditSongCell(object sender, RoutedEventArgs e)
+        {
+            songDataGrid.BeginEdit();
+        }
+
+        private void songDataGrid_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            // When right-clicking on a cell, select that cell.
+            if (e.RightButton == MouseButtonState.Pressed)
+            {
+                try
+                {
+                    System.Windows.Controls.DataGridCell cell = (System.Windows.Controls.DataGridCell)
+                    VisualTreeHelper.GetParent(
+                        VisualTreeHelper.GetParent(
+                            VisualTreeHelper.GetParent(
+                                (UIElement)e.OriginalSource)));
+
+                    songDataGrid.CurrentColumn = cell.Column;
+                } catch(InvalidCastException)
+                {
+                    // Mouse was pressed over something else than a cell.
+                }
+            }
         }
     }
 }

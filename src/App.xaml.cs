@@ -137,7 +137,7 @@ namespace Viscera_Cleanup_DJ
 
             int sampleCount = (int) Duration * 44100;
 
-            Buffer.BlockCopy(Properties.Resources.template_upk, 0, package, 0, Properties.Resources.template_upk.Length);
+            Buffer.BlockCopy(Properties.Resources.template_upk, 0, package, 0, 2476);
 
             Buffer.BlockCopy(Guid.NewGuid().ToByteArray(), 0, package, 69, 16);
             Buffer.BlockCopy(System.Text.Encoding.ASCII.GetBytes(cue.ToCharArray()), 0, package, 598, 14);
@@ -172,7 +172,7 @@ namespace Viscera_Cleanup_DJ
             ff.StartInfo.FileName = GetFFmpeg();
             ff.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
             ff.StartInfo.Arguments = string.Format(
-                "-i \"{0}\" -ac 1 -f ogg -codec:a libvorbis -b:a 110k -ar 44100 pipe:1", sourceFile);
+                "-i \"{0}\" -vn -ac 1 -ar 44100 -f ogg -codec:a libvorbis -b:a 110k pipe:1", sourceFile);
             ff.StartInfo.RedirectStandardOutput = true;
             ff.StartInfo.RedirectStandardError = true;
             ff.Start();
@@ -324,6 +324,9 @@ namespace Viscera_Cleanup_DJ
             int i = 0;
             foreach (string source in filenames)
             {
+                float progress = (float) i / filenames.Length;
+                ReportProgress(1 + (int)(progress * 98), source);
+
                 int packIndex = PlaylistEditor.GetFreeIndex();
                 string packName = Global.PackageName.Value;
                 if (Global.GroupMask.Value != "")
@@ -341,16 +344,32 @@ namespace Viscera_Cleanup_DJ
 
                 song.Title = output.Title;
                 song.Artist = output.Artist;
+
+                if (song.Title == "")
+                {
+                    string filename = Path.GetFileNameWithoutExtension(source);
+
+                    // Try to parse from filename in "Artist - Title.mp3" format.
+                    int a = filename.IndexOf("-");
+                    if (a > 2 && a < filename.Length * 0.7)
+                    {
+                        song.Artist = filename.Substring(0, a).Trim();
+                        song.Title = filename.Substring(a+1).Trim();
+                    }
+                    else
+                    {
+                        song.Title = filename;
+                    }
+                }
+
                 PlaylistEditor.SongList.Add(song);
                 PlaylistEditor.Write();
-
-                ReportProgress(i);
                 i++;
             }
         }
     }
 
-    public class Song
+    public class Song : IEditableObject
     {
         public string Title { get; set; }
         public string Artist { get; set; }
@@ -392,13 +411,29 @@ namespace Viscera_Cleanup_DJ
 
         public string ToIniString()
         {
-            return string.Format("(SongTitle=\"{0}\",SongArtist=\"{1}\",SongSoundCue=\"{2}\")", 
+            return string.Format("(SongTitle=\"{0}\",SongArtist=\"{1}\",SongSoundCue=\"{2}\",BeatTracks=((StartTime=0.1234,Frequency=4,Intensity=0.5)))", 
                 Title.Replace('"', '\''), Artist.Replace('"', '\''), Package + "." + SoundCue);
         }
 
         public static string MakeSoundCue(int index)
         {
             return string.Format("cleanupdj_{0:0000}", index);
+        }
+
+        void IEditableObject.BeginEdit()
+        {
+            
+        }
+
+        void IEditableObject.CancelEdit()
+        {
+            // Something else is already reverting the data.
+            // ???
+        }
+        
+        void IEditableObject.EndEdit()
+        {
+            PlaylistEditor.Write();
         }
     }
 

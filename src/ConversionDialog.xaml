@@ -5,16 +5,29 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Viscera_Cleanup_DJ"
         mc:Ignorable="d"
-        Title="Converting" Height="180" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" Width="400">
+        Title="Converting" Height="211.457" ResizeMode="NoResize" WindowStartupLocation="CenterOwner" Width="420">
     <Grid Margin="0">
+        <Grid.Background>
+            <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                <GradientStop Color="#FFFFE1FC" Offset="0"/>
+                <GradientStop Color="#FFFFC3FC" Offset="1"/>
+            </LinearGradientBrush>
+        </Grid.Background>
         <Grid.ColumnDefinitions>
             <ColumnDefinition/>
         </Grid.ColumnDefinitions>
-        <ProgressBar Height="20" Margin="10,0,10,55" VerticalAlignment="Bottom" ValueChanged="ProgressBar_ValueChanged"/>
-        <StackPanel Background="#FFF0F0F0" Orientation="Horizontal" FlowDirection="RightToLeft" Height="50" VerticalAlignment="Bottom" RenderTransformOrigin="0.495,0.88">
-            <Button x:Name="abortButton" Content="Cancel" Margin="10" Padding="12,1" Click="AbortButton_Click"/>
+        <ProgressBar x:Name="progressBar" Height="20" Margin="10,0,10,59" VerticalAlignment="Bottom" ValueChanged="ProgressBar_ValueChanged" Foreground="#FF30E238" BorderBrush="#FFBD9DB4" Background="#FFBD9DB4"/>
+        <StackPanel Orientation="Horizontal" FlowDirection="RightToLeft" Height="50" VerticalAlignment="Bottom" RenderTransformOrigin="0.495,0.88">
+            <StackPanel.Background>
+                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                    <GradientStop Color="#FFF950F9" Offset="0"/>
+                    <GradientStop Color="#FFA60071" Offset="1"/>
+                </LinearGradientBrush>
+            </StackPanel.Background>
+            <Button x:Name="abortButton" Content="Stop" Margin="10" Padding="12,1" Click="AbortButton_Click" Background="#FFDD93FF" Foreground="Black" BorderBrush="Black"/>
         </StackPanel>
-        <Label x:Name="label" Content="Converting" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Height="49" Width="374" Padding="0"/>
+        <TextBlock x:Name="message" HorizontalAlignment="Left" Margin="10,10,0,0" TextWrapping="Wrap" VerticalAlignment="Top" RenderTransformOrigin="0.475,0.489" Height="60" Width="394" FontSize="14"><Run Text="Converting"/><LineBreak/></TextBlock>
+        <TextBlock x:Name="timeEstimate" HorizontalAlignment="Left" Margin="10,0,0,81" TextWrapping="Wrap" VerticalAlignment="Bottom" Height="24" Width="394" Text="Time remaining: "/>
 
     </Grid>
 </Window>

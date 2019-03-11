@@ -84,10 +84,16 @@ namespace Viscera_Cleanup_DJ
             MainGrid.Children.Add(element);
         }
 
-        public static void Information(Window owner, string text)
+        public static void Information(Window owner, string text, string buttonText = "")
         {
             MessengerBox dialog = new MessengerBox(owner);
             dialog.Message.Text = text;
+
+            if (buttonText != "")
+            {
+                dialog.AddButton(buttonText, true);
+            }
+
             dialog.ShowDialog();
         }
 
