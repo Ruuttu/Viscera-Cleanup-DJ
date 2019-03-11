@@ -136,10 +136,10 @@
         </Grid>
         <StatusBar Margin="0" VerticalAlignment="Bottom" Height="28">
             <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0,0,0">
-                <TextBlock>Audio processing by <Hyperlink Click="FFmpegLinkClick" ToolTip="https://www.ffmpeg.org">FFmpeg</Hyperlink>.</TextBlock>
+                <TextBlock>Audio processing by <Hyperlink Click="LinkClick" ToolTip="https://www.ffmpeg.org">FFmpeg</Hyperlink>.</TextBlock>
             </StatusBarItem>
             <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0" HorizontalAlignment="Right">
-                <TextBlock>asdasdasd</TextBlock>
+                <TextBlock>Get updates on <Hyperlink Click="LinkClick" ToolTip="https://github.com/Ruuttu/Viscera-Cleanup-DJ">GitHub</Hyperlink>.</TextBlock>
             </StatusBarItem>
         </StatusBar>
         <Button x:Name="AddFilesButton" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="160" FontSize="14" Content="Add music from PC..." Click="AddFilesButton_Click" BorderBrush="#FF707070" Background="#FFDDDDDD" Height="40"/>

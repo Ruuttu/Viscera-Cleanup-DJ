@@ -233,7 +233,7 @@ namespace Viscera_Cleanup_DJ
             LoadSongsToView();
         }
 
-        private void FFmpegLinkClick(object sender, RoutedEventArgs e)
+        private void LinkClick(object sender, RoutedEventArgs e)
         {
             Hyperlink link = (Hyperlink)sender;
             Process.Start(link.ToolTip.ToString());
