@@ -129,17 +129,17 @@
                 </DataGrid.ContextMenu>
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="Title" Width="400" Binding="{Binding Title}" SortMemberPath="Title" />
-                    <DataGridTextColumn Header="Artist" Width="344" Binding="{Binding Artist}" SortMemberPath="Artist" />
+                    <DataGridTextColumn Header="Artist" Width="342" Binding="{Binding Artist}" SortMemberPath="Artist" />
                 </DataGrid.Columns>
             </DataGrid>
             <Label x:Name="noSongsLabel" Content="Empty! Use the top left button to add songs." HorizontalAlignment="Center" Margin="10" VerticalAlignment="Center" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="16" Height="32" Width="322" IsEnabled="False"/>
         </Grid>
         <StatusBar Margin="0" VerticalAlignment="Bottom" Height="28">
-            <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0,0,0">
-                <TextBlock>Audio processing by <Hyperlink Click="LinkClick" ToolTip="https://www.ffmpeg.org">FFmpeg</Hyperlink>.</TextBlock>
+            <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0" HorizontalAlignment="Left">
+                <TextBlock x:Name="statusText"></TextBlock>
             </StatusBarItem>
-            <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0" HorizontalAlignment="Right">
-                <TextBlock>Get updates on <Hyperlink Click="LinkClick" ToolTip="https://github.com/Ruuttu/Viscera-Cleanup-DJ">GitHub</Hyperlink>.</TextBlock>
+            <StatusBarItem Height="30" VerticalAlignment="Bottom" Margin="4,0" HorizontalAlignment="Right" FlowDirection="LeftToRight">
+                <TextBlock><Run Text="Get updates on "/><Hyperlink Click="LinkClick" ToolTip="https://github.com/Ruuttu/Viscera-Cleanup-DJ"><Run Text="GitHub"/></Hyperlink><Run Text="."/> <Run Text="Audio processing by "/><Hyperlink Click="LinkClick" ToolTip="https://www.ffmpeg.org"><Run Text="FFmpeg"/></Hyperlink><Run Text="."/></TextBlock>
             </StatusBarItem>
         </StatusBar>
         <Button x:Name="AddFilesButton" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="160" FontSize="14" Content="Add music from PC..." Click="AddFilesButton_Click" BorderBrush="#FF707070" Background="#FFDDDDDD" Height="40"/>

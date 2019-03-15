@@ -5,8 +5,8 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Viscera_Cleanup_DJ"
         mc:Ignorable="d"
-        Title="Settings" WindowStartupLocation="CenterOwner" MinWidth="300" MinHeight="200" ShowInTaskbar="False" SizeToContent="WidthAndHeight" ResizeMode="NoResize">
-    <Grid Width="500" Height="201">
+        Title="Settings" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="NoResize" SizeToContent="WidthAndHeight">
+    <Grid Width="500" Margin="0" Height="268">
         <Grid.RowDefinitions>
             <RowDefinition/>
         </Grid.RowDefinitions>
@@ -16,17 +16,19 @@
         <TextBox x:Name="gamePath" HorizontalAlignment="Left" Height="23" Margin="10,41,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="400" VerticalContentAlignment="Center"/>
         <Button x:Name="gamePathBrowseButton" Content="Browse..." HorizontalAlignment="Left" Margin="415,41,0,0" VerticalAlignment="Top" Width="75" Height="23" Click="gamePathBrowseButton_Click"/>
         <Label x:Name="label" Content="Game Install Location" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Width="480" Padding="0,5,5,5"/>
-        <ComboBox x:Name="groupMask" HorizontalAlignment="Left" Margin="10,100,0,0" VerticalAlignment="Top" Width="230" IsEditable="True" SelectedIndex="0">
+        <ComboBox x:Name="groupMask" HorizontalAlignment="Left" Margin="10,105,0,0" VerticalAlignment="Top" Width="230" IsEditable="True" SelectedIndex="0">
             <ComboBoxItem Content="(No group)"/>
             <ComboBoxItem Content="Viscera"/>
             <ComboBoxItem Content="Santa"/>
         </ComboBox>
-        <Label x:Name="label1" Content="Group Mask" HorizontalAlignment="Left" Margin="10,69,0,0" VerticalAlignment="Top" Padding="0,5,5,5" Width="230"/>
-        <StackPanel HorizontalAlignment="Left" Height="50" Margin="0,151,0,0" VerticalAlignment="Top" Width="500" Background="#FFF0F0F0" Orientation="Horizontal" FlowDirection="RightToLeft">
+        <Label x:Name="label1" Content="Group Mask" HorizontalAlignment="Left" Margin="10,74,0,0" VerticalAlignment="Top" Padding="0,5,5,5" Width="230"/>
+        <StackPanel HorizontalAlignment="Left" Height="50" Margin="0" VerticalAlignment="Bottom" Width="500" Background="#FFF0F0F0" Orientation="Horizontal" FlowDirection="RightToLeft">
             <Button x:Name="saveButton" Content="Save Settings" Margin="10" Padding="12,1" Click="SaveButton_Click"/>
         </StackPanel>
-        <Label x:Name="label1_Copy" Content="Package Name" HorizontalAlignment="Left" Margin="260,69,0,0" VerticalAlignment="Top" Padding="0,5,5,5" Width="230"/>
-        <TextBox x:Name="packageName" HorizontalAlignment="Left" Height="22" Margin="260,100,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="230" MaxLines="1" VerticalContentAlignment="Center"/>
+        <Label x:Name="label1_Copy" Content="Package Name" HorizontalAlignment="Left" Margin="260,74,0,0" VerticalAlignment="Top" Padding="0,5,5,5" Width="230"/>
+        <TextBox x:Name="packageName" HorizontalAlignment="Left" Height="22" Margin="260,105,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="230" MaxLines="1" VerticalContentAlignment="Center"/>
+        <TextBlock x:Name="textBlock" HorizontalAlignment="Left" Margin="10,132,0,0" TextWrapping="Wrap" VerticalAlignment="Top" RenderTransformOrigin="-0.571,0.125" Height="78" Width="230" TextDecorations="{x:Null}" FontStyle="Italic" Foreground="#FF424242"><Run Text="Songs placed into a group will only play on radios that match that group. For example, the radio in &quot;Santa's Rampage&quot; level only plays &quot;Santa&quot; group songs"/><Run Text=". "/></TextBlock>
+        <TextBlock x:Name="textBlock1" HorizontalAlignment="Left" Margin="260,132,0,0" TextWrapping="Wrap" Text="Name for the INI and UPK files. You could change this into a unique name when making a mod." VerticalAlignment="Top" Height="78" Width="230" FontStyle="Italic" Foreground="#FF424242"/>
 
     </Grid>
 </Window>

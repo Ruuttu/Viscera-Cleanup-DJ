@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.ComponentModel;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Configuration;
@@ -26,6 +27,7 @@ namespace Viscera_Cleanup_DJ
         public static RegistryString GamePath = new RegistryString("GamePath");
         public static RegistryString GroupMask = new RegistryString("GroupMask");
         public static RegistryString PackageName = new RegistryString("PackageName", "CleanupDJ");
+        public static RegistryString BeatTrackMulti = new RegistryString("BeatTrackMulti", 1f.ToString());
     }
 
     public partial class App : Application
@@ -158,6 +160,200 @@ namespace Viscera_Cleanup_DJ
         }
     }
 
+    public class PCM
+    {
+        public Process Process;
+
+        public short[] GetSampleData()
+        {
+            byte[] bytes = new byte[] { };
+            int index = 0;
+            int readSize = 65536;
+            int nBytesRead;
+            do
+            {
+                if (bytes.Length < index + readSize)
+                {
+                    Array.Resize(ref bytes, bytes.Length + readSize * 5);
+                }
+                nBytesRead = Process.StandardOutput.BaseStream.Read(bytes, index, readSize);
+                index += nBytesRead;
+            } while (nBytesRead > 0);
+
+            short[] samples = new short[bytes.Length / 2];
+            int nSamples = bytes.Length / 2;
+            for (int sample = 0; sample < nSamples; sample++)
+            {
+                samples[sample] = BitConverter.ToInt16(bytes, sample * 2);
+            }
+
+            return samples;
+        }
+
+        public Dictionary<float, float> GetBeats(short[] samples, int sampleRate)
+        {
+            Dictionary<float, float> Beats = new Dictionary<float, float>();
+
+            int loudnessStep = 11;
+            int loudnessWindow = 21;
+            int windowX = -11;
+            short[] loudness = new short[samples.Length / loudnessStep];
+            for (var i = 0; i < loudness.Length - loudnessStep; i++)
+            {
+                int total = 0;
+                for (int li = 0; li < loudnessWindow; li++)
+                {
+                    total += (int) Math.Pow(samples[Math.Max(0, i * loudnessStep + li + windowX)], 2);
+                }
+                loudness[i] = (short) Math.Sqrt(total / loudnessWindow);
+            }
+
+            short[] bloomLoudness = new short[loudness.Length];
+            int bloomWindow = 91;
+            int bloomWindowX = -46;
+            for (var i = 0; i < loudness.Length; i++)
+            {
+                int total = 0;
+                for (int li = 0; li < bloomWindow; li++)
+                {
+                    total += loudness[Math.Max(0, Math.Min(loudness.Length - 1, i + li + bloomWindowX))];
+                }
+                bloomLoudness[i] = (short) (total / bloomWindow);
+            }
+
+            int windowSize = (int) (sampleRate / loudnessStep * 2); // two seconds.
+            int wa = -windowSize / 2;
+            int wb = wa + windowSize;
+
+            int previousLoudestIndex = -1;
+            for (int i = 0; i < loudness.Length; i++)
+            {
+                int loudestIndex = -1;
+                double loudestLoudness = 0;
+                for (int ofs = wa; ofs < wb; ofs++)
+                {
+                    int index = Math.Max(0, Math.Min(loudness.Length - 1, i + ofs));
+                    double value = loudness[index] - bloomLoudness[index]; // * (0.51 - ((double)Math.Abs(ofs) / windowSize));
+                    if (value > loudestLoudness)
+                    {
+                        loudestLoudness = value;
+                        loudestIndex = index;
+                    }
+                }
+
+                if (loudestIndex != -1 && loudestIndex != previousLoudestIndex)
+                {
+                    Beats[loudestIndex * loudnessStep / (float) sampleRate] = (float) loudestLoudness / 33000.0f;
+                }
+
+                previousLoudestIndex = loudestIndex;
+            }
+
+            return Beats;
+        }
+
+        public static string GetBeatTracks(short[] samples, int sampleRate)
+        {
+            double duration = samples.Length / sampleRate;
+
+            int loudnessStep = 5;
+            int loudnessWindow = 9;
+            int windowX = -4;
+
+            // How many loudness samples there are per second.
+            double lps = sampleRate / loudnessStep; 
+
+            float[] loudness = new float[samples.Length / loudnessStep];
+            for (var i = 0; i < loudness.Length - loudnessStep; i++)
+            {
+                double total = 0;
+                for (int li = 0; li < loudnessWindow; li++)
+                {
+                    total += Math.Pow(samples[Math.Max(0, i * loudnessStep + li + windowX)] / 32768.0, 2);
+                }
+                loudness[i] = (float) Math.Sqrt(total / (float)loudnessWindow);
+            }
+
+            // ------------------
+
+            double bestCorrelation = 0;
+            double bestOffset = 0;
+            int startAt = (int) (loudness.Length * 0.25);
+            int stopAt = (int) (loudness.Length * 0.75);
+            for (int offset = (int) Math.Ceiling(lps * 0.25); offset <= lps * 1.5; offset++)
+            {
+                double crossCorrelation = 0;
+                for (int i = startAt; i < stopAt; i+=2)
+                {
+                    crossCorrelation += (
+                          loudness[i] * loudness[i + offset]
+                        + loudness[i + 1] * loudness[i + offset + 1]
+                    );
+                }
+
+                crossCorrelation *= 1.0 - (offset / lps) * 0.05;
+
+                if (crossCorrelation > bestCorrelation)
+                {
+                    bestCorrelation = crossCorrelation;
+                    bestOffset = offset;
+                }
+            }
+
+            double beatsPerMinute;
+            if (bestOffset != 0)
+            {
+                beatsPerMinute  = 1 / (bestOffset / lps) * 60;
+            } else
+            {
+                beatsPerMinute = 120;
+            }
+
+            // ------------------
+
+            string beatTracks = "";
+
+            double chunkDuration = 60 / beatsPerMinute * 1.5;
+            int chunkLoudSampleCount = (int) Math.Floor(chunkDuration * lps);
+            double position = 0;
+
+            float multiplier;
+            if (!float.TryParse(Global.BeatTrackMulti.Value, out multiplier))
+            {
+                multiplier = 1;
+            }
+
+            double previousIntensity = -1;
+            while (position < duration - chunkDuration * 1.01)
+            {
+                int samplePosition = (int) Math.Round(position * lps);
+                double accumulatedLoudness = 0;
+                for (int i = 0; i < chunkLoudSampleCount; i++)
+                {
+                    accumulatedLoudness += loudness[samplePosition + i];
+                }
+                double intensity = accumulatedLoudness / chunkLoudSampleCount * 2.4;
+
+                if (Math.Abs(intensity - previousIntensity) > 0.1) {
+                    if (beatTracks != "")
+                    {
+                        beatTracks += ",";
+                    }
+                    beatTracks += string.Format(
+                        CultureInfo.InvariantCulture,
+                        "(StartTime={0:0.00},Frequency={1:0.00},Intensity={2:0.0})",
+                        position, beatsPerMinute / 60, intensity * multiplier
+                    );
+                    previousIntensity = intensity;
+                }
+
+                position += chunkDuration;
+            }
+
+            return beatTracks;
+        }
+    }
+
     public class FFmpegRunner
     {
         static string tempFFmpegPath = Path.Combine(Path.GetTempPath(), "viscera-cleanup-dj-ffmpeg.exe");
@@ -172,7 +368,7 @@ namespace Viscera_Cleanup_DJ
             ff.StartInfo.FileName = GetFFmpeg();
             ff.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
             ff.StartInfo.Arguments = string.Format(
-                "-i \"{0}\" -vn -ac 1 -ar 44100 -f ogg -codec:a libvorbis -b:a 110k pipe:1", sourceFile);
+                "-i \"{0}\" -vn -ac 1 -ar 44100 -f ogg -codec:a libvorbis -b:a 100k pipe:1", sourceFile);
             ff.StartInfo.RedirectStandardOutput = true;
             ff.StartInfo.RedirectStandardError = true;
             ff.Start();
@@ -190,7 +386,7 @@ namespace Viscera_Cleanup_DJ
             // -------------------------
 
             int index = 0;
-            int readSize = 16384;
+            int readSize = 32768;
             int nBytesRead;
             do
             {
@@ -226,14 +422,14 @@ namespace Viscera_Cleanup_DJ
                     }
                 }
 
-                a = line.IndexOf(" artist");
+                a = line.IndexOf(" artist :");
                 b = line.IndexOf(":", a + 1);
                 if (a != -1 && b > a)
                 {
                     output.Artist = line.Substring(b+1).Trim();
                 }
 
-                a = line.IndexOf(" title");
+                a = line.IndexOf(" title :");
                 b = line.IndexOf(":", a + 1);
                 if (a != -1 && b > a)
                 {
@@ -244,12 +440,33 @@ namespace Viscera_Cleanup_DJ
             return output;
         }
 
+        static public PCM ConvertPCM(string sourceFile, int sampleRate)
+        {
+            Process ff = new Process();
+            ff.StartInfo.CreateNoWindow = true;
+            ff.StartInfo.UseShellExecute = false;
+            ff.StartInfo.FileName = GetFFmpeg();
+            ff.StartInfo.WindowStyle = ProcessWindowStyle.Hidden;
+            ff.StartInfo.Arguments = string.Format(
+                "-i \"{0}\" -vn -ac 1 -ar {1} -f s16le -codec:a pcm_s16le pipe:1", sourceFile, sampleRate);
+            ff.StartInfo.RedirectStandardOutput = true;
+            ff.Start();
+
+            PCM output = new PCM();
+            output.Process = ff;
+
+            return output;
+        }
+
         static public string GetFFmpeg()
         {
-            FileInfo info = new FileInfo(tempFFmpegPath);
-            if (!info.Exists || info.Length != Properties.Resources.ffmpeg_3_4_1.Length)
+            lock (tempFFmpegPath)
             {
-                File.WriteAllBytes(tempFFmpegPath, Properties.Resources.ffmpeg_3_4_1);
+                FileInfo info = new FileInfo(tempFFmpegPath);
+                if (!info.Exists || info.Length != Properties.Resources.ffmpeg_3_4_1.Length)
+                {
+                    File.WriteAllBytes(tempFFmpegPath, Properties.Resources.ffmpeg_3_4_1);
+                }
             }
 
             return tempFFmpegPath;
@@ -310,6 +527,8 @@ namespace Viscera_Cleanup_DJ
 
     public class BackgroundConverter : BackgroundWorker
     {
+        static public int StepsPerSong = 2;
+
         public BackgroundConverter()
         {
             WorkerReportsProgress = true;
@@ -319,15 +538,25 @@ namespace Viscera_Cleanup_DJ
 
         public void ConvertQueue(object s, DoWorkEventArgs args)
         {
-            string[] filenames = (string[]) args.Argument;
+            BlockingCollection<string> queue = (BlockingCollection<string>)args.Argument;
 
-            int i = 0;
-            foreach (string source in filenames)
-            {
-                float progress = (float) i / filenames.Length;
-                ReportProgress(1 + (int)(progress * 98), source);
+            string source;
+            while (true) {
+                if (!queue.TryTake(out source))
+                {
+                    break;
+                }
 
-                int packIndex = PlaylistEditor.GetFreeIndex();
+                // Find index and name for the upk.
+                // --------------------------------
+
+                int packIndex;
+                packIndex = PlaylistEditor.GetFreeIndex();
+                lock (PlaylistEditor.ClaimedIndices)
+                {
+                    PlaylistEditor.ClaimedIndices.Add(packIndex);
+                }
+
                 string packName = Global.PackageName.Value;
                 if (Global.GroupMask.Value != "")
                 {
@@ -335,15 +564,37 @@ namespace Viscera_Cleanup_DJ
                 }
                 packName += "_" + string.Format("{0:0000}", packIndex);
 
+                // Start encoding PCM in the background.
+                // -------------------------------------
+
+                PCM pcm = FFmpegRunner.ConvertPCM(source, 1000);
+
+                // Convert the audio.
+                // ------------------
+
                 Song song = new Song();
                 song.Package = packName;
                 song.SoundCue = Song.MakeSoundCue(packIndex);
 
-                Ogg output = FFmpegRunner.ConvertOgg(source);
-                output.WriteToPackage(song.PackageFile(), song.SoundCue);
+                Ogg ogg = FFmpegRunner.ConvertOgg(source);
 
-                song.Title = output.Title;
-                song.Artist = output.Artist;
+                if (CancellationPending)
+                {
+                    break;
+                }
+
+                ReportProgress(1, source);
+
+                // Generate beat tracks.
+                // ---------------------
+                short[] samples = pcm.GetSampleData();
+                song.BeatTracks = PCM.GetBeatTracks(samples, 1000);
+
+                // Add the song entry.
+                // -------------------
+
+                song.Title = ogg.Title;
+                song.Artist = ogg.Artist;
 
                 if (song.Title == "")
                 {
@@ -362,9 +613,23 @@ namespace Viscera_Cleanup_DJ
                     }
                 }
 
-                PlaylistEditor.SongList.Add(song);
-                PlaylistEditor.Write();
-                i++;
+                if (CancellationPending)
+                {
+                    break;
+                }
+
+                lock (PlaylistEditor.SongList)
+                {
+                    PlaylistEditor.SongList.Add(song);
+                    PlaylistEditor.Write();
+                }
+
+                // Write the upk.
+                // --------------
+
+                ogg.WriteToPackage(song.PackageFile(), song.SoundCue);
+
+                ReportProgress(1, source);
             }
         }
     }
@@ -374,6 +639,8 @@ namespace Viscera_Cleanup_DJ
         public string Title { get; set; }
         public string Artist { get; set; }
         public string GroupMask { get; set; }
+
+        public string BeatTracks { get; set; }
 
         public string Package { get; set; }
         public string SoundCue { get; set; }
@@ -401,6 +668,10 @@ namespace Viscera_Cleanup_DJ
             song.Package = soundCueStr.Substring(0, a);
             song.SoundCue = soundCueStr.Substring(a + 1);
 
+            a = iniStr.IndexOf("BeatTracks=", b);
+            b = iniStr.IndexOf("))", a);
+            song.BeatTracks = iniStr.Substring(a + 12, b - a - 13);
+
             return song;
         }
 
@@ -411,8 +682,8 @@ namespace Viscera_Cleanup_DJ
 
         public string ToIniString()
         {
-            return string.Format("(SongTitle=\"{0}\",SongArtist=\"{1}\",SongSoundCue=\"{2}\",BeatTracks=((StartTime=0.1234,Frequency=4,Intensity=0.5)))", 
-                Title.Replace('"', '\''), Artist.Replace('"', '\''), Package + "." + SoundCue);
+            return string.Format("(SongTitle=\"{0}\",SongArtist=\"{1}\",SongSoundCue=\"{2}\",BeatTracks=({3}))", 
+                Title.Replace('"', '\''), Artist.Replace('"', '\''), Package + "." + SoundCue, BeatTracks);
         }
 
         public static string MakeSoundCue(int index)
@@ -440,6 +711,7 @@ namespace Viscera_Cleanup_DJ
     public class PlaylistEditor
     {
         public static List<Song> SongList = new List<Song>();
+        public static List<int> ClaimedIndices = new List<int>();
 
         public static void Read()
         {
@@ -515,22 +787,29 @@ namespace Viscera_Cleanup_DJ
 
         public static int GetFreeIndex()
         {
-            for (int i = 0; i <= 9999; i++)
+            lock (SongList) lock (ClaimedIndices)
             {
-                string cue = Song.MakeSoundCue(i);
-                bool taken = false;
-                foreach (Song song in SongList)
+                for (int i = 0; i <= 9999; i++)
                 {
-                    if (song.SoundCue == cue)
+                    if (ClaimedIndices.Contains(i))
                     {
-                        taken = true;
-                        break;
+                        continue;
                     }
-                }
+                    string cue = Song.MakeSoundCue(i);
+                    bool taken = false;
+                    foreach (Song song in SongList)
+                    {
+                        if (song.SoundCue == cue)
+                        {
+                            taken = true;
+                            break;
+                        }
+                    }
 
-                if (!taken)
-                {
-                    return i;
+                    if (!taken)
+                    {
+                        return i;
+                    }
                 }
             }
             throw new Exception();

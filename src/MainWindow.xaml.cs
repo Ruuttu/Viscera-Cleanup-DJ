@@ -1,12 +1,13 @@
 ﻿using System;
 using System.IO;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Forms;
@@ -89,6 +90,7 @@ namespace Viscera_Cleanup_DJ
             }
 
             noSongsLabel.Visibility = SongView.Count == 0 ? Visibility.Visible : Visibility.Hidden;
+            statusText.Text = string.Format("{0} / 50 songs", SongView.Count);
             
         }
 
@@ -118,47 +120,94 @@ namespace Viscera_Cleanup_DJ
                 return;
             }
 
+            string[] filenames = dialog.FileNames;
+
+            int maxAdd = 50 - PlaylistEditor.SongList.Count;
+            if (filenames.Length > maxAdd)
+            {
+                MessengerBox.Information(this, "Sorry, you can have max 50 songs.");
+                Array.Resize(ref filenames, maxAdd);
+            }
+
+            if (filenames.Length < 1)
+            {
+                return;
+            }
+
+            // --------------------------------
+
             ConversionDialog conversionDialog = new ConversionDialog();
             conversionDialog.Owner = this;
 
-            List<int> timeSamples = new List<int>();
-            Stopwatch conversionTime = new Stopwatch();
-            int filesLeft = dialog.FileNames.Length;
+            BlockingCollection<string> conversionQueue = new BlockingCollection<string>();
+            foreach (string source in filenames)
+            {
+                conversionQueue.Add(source);
+            }
+            conversionQueue.CompleteAdding();
 
-            BackgroundConverter converter = new BackgroundConverter();
-            converter.RunWorkerCompleted += delegate (object s, RunWorkerCompletedEventArgs rwcea)
+            // --------------------------------
+
+            Stopwatch sw = new Stopwatch();
+            sw.Start();
+
+            int nThreads = 3;
+            int finishedSteps = 0;
+            int totalSteps = filenames.Length * BackgroundConverter.StepsPerSong;
+
+            System.Windows.Threading.DispatcherTimer intervalTimer = new System.Windows.Threading.DispatcherTimer();
+            double prediction = -0.5;
+            intervalTimer.Tick += delegate (object s, EventArgs tickEvent)
             {
-                conversionDialog.Close();
+                prediction = Math.Min(0.8, prediction + 0.03);
+                double progress = (finishedSteps + Math.Max(0, prediction)) / totalSteps;
+                conversionDialog.progressBar.Value = progress * 98;
             };
-            converter.ProgressChanged += delegate (object s, ProgressChangedEventArgs prog)
+            intervalTimer.Interval = new TimeSpan(200000);
+            intervalTimer.Start();
+
+            // --------------------------------
+
+            List<BackgroundConverter> threads = new List<BackgroundConverter>();
+            CountdownEvent threadsFinished = new CountdownEvent(nThreads);
+
+            for (int t = 0; t < nThreads; t++)
             {
-                if (conversionTime.IsRunning)
+                BackgroundConverter converterThread = new BackgroundConverter();
+                threads.Add(converterThread);
+
+                converterThread.RunWorkerCompleted += delegate (object s, RunWorkerCompletedEventArgs rwcea)
                 {
-                    timeSamples.Add((int)conversionTime.ElapsedTicks);
-                    if (timeSamples.Count > 20)
+                    threadsFinished.Signal();
+                    if (threadsFinished.IsSet)
                     {
-                        timeSamples.RemoveAt(0);
+                        Debug.Print(sw.Elapsed.ToString());
+                        conversionDialog.Close();
                     }
-                }
-                conversionTime.Restart();
-
-                conversionDialog.progressBar.Value = prog.ProgressPercentage;
-                conversionDialog.message.Text = string.Format("Converting for Big Banger Radio:\n\"{0}\" ", System.IO.Path.GetFileName((string) prog.UserState));
-
-                if (timeSamples.Count >= 2)
+                };
+                converterThread.ProgressChanged += delegate (object s, ProgressChangedEventArgs prog)
                 {
-                    double ticksPerFile = timeSamples.Average();
-                    TimeSpan estimate = new TimeSpan((long)ticksPerFile * filesLeft);
-                    conversionDialog.timeEstimate.Text = string.Format("Time remaining: {0}", TimeSpan.FromSeconds((int)estimate.TotalSeconds));
-                }
+                    finishedSteps += prog.ProgressPercentage;
+                    prediction = 0;
+                };
+                converterThread.RunWorkerAsync(conversionQueue);
+            }
 
-                filesLeft--;
+            // --------------------------------
+
+            conversionDialog.Closing += delegate (object cancelSender, CancelEventArgs cancelEvent)
+            {
+                foreach (BackgroundConverter thread in threads)
+                {
+                    thread.CancelAsync();
+                }
             };
-            converter.RunWorkerAsync(dialog.FileNames);
+
+            // --------------------------------
 
             conversionDialog.ShowDialog();
-
             LoadSongsToView();
+
         }
 
         private void AddOnlineButton_Click(object sender, RoutedEventArgs e)
@@ -241,6 +290,11 @@ namespace Viscera_Cleanup_DJ
 
         private void DeleteSongs(object sender, RoutedEventArgs e)
         {
+            if (songDataGrid.SelectedItems.Count <= 0)
+            {
+                return;
+            }
+
             MessengerBox dialog = new MessengerBox(this);
             if (songDataGrid.SelectedItems.Count == 1)
             {
